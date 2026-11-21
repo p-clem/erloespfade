@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DRG-Erlöspfade</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#1E2B78">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Erlöspfade">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<meta name="robots" content="noindex, nofollow">
+<style>
+/* Layout: Suchkopf oben, darunter Wurzelkarte (aktuelle DRG) und ein linksbündiger Pfadbaum mit Verbindungslinien */
+:root {
+  --bg: #F2F5F4; --surface: #FFFFFF; --surface-2: #E7EDEB; --ink: #15212A; --muted: #586A72; --line: #CAD5D2;
+  --accent: #2B3C9C; --accent-soft: #E2E6FA; --on-accent: #FFFFFF;
+  --root-bg: #1E2B78; --root-fg: #F2F4FF; --root-muted: #B9C1EE;
+  --gain: #0C7547; --gain-soft: #DBF1E5; --warn: #9A5B00; --warn-soft: #FAEAD0; --hard: #AE3434; --hard-soft: #F6DFDD;
+  --shadow: 0 10px 30px rgba(21, 33, 42, .12);
+  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E1418; --surface: #161F25; --surface-2: #1F2A31; --ink: #E5ECEA; --muted: #95A5AB; --line: #31424A;
+  --accent: #A3AFFF; --accent-soft: #232A55; --on-accent: #10163A;
+  --root-bg: #262F6E; --root-fg: #EEF0FF; --root-muted: #AAB3E8;
+  --gain: #55D394; --gain-soft: #15362A; --warn: #F0B45C; --warn-soft: #3A2A12; --hard: #F28C86; --hard-soft: #3D1D1C;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .45); color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #0E1418; --surface: #161F25; --surface-2: #1F2A31; --ink: #E5ECEA; --muted: #95A5AB; --line: #31424A;
+  --accent: #A3AFFF; --accent-soft: #232A55; --on-accent: #10163A;
+  --root-bg: #262F6E; --root-fg: #EEF0FF; --root-muted: #AAB3E8;
+  --gain: #55D394; --gain-soft: #15362A; --warn: #F0B45C; --warn-soft: #3A2A12; --hard: #F28C86; --hard-soft: #3D1D1C;
+  --shadow: 0 10px 30px rgba(0, 0, 0, .45); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; -webkit-text-size-adjust: 100%; }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.wrap { max-width: 980px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: calc(20px + env(safe-area-inset-top, 0px)) calc(48px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 20px; }
+
+.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.brand { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.mark { width: 42px; height: 42px; border-radius: 11px; background: var(--root-bg); color: var(--root-fg); display: grid; place-items: center; flex: none; }
+h1 { font-family: var(--font-display); font-size: 1.55rem; font-weight: 800; letter-spacing: -.01em; margin: 0; line-height: 1.15; }
+.brand p { margin: 0; color: var(--muted); font-size: .9rem; }
+.ghost { background: transparent; border: 1px solid var(--line); padding: 8px 14px; border-radius: 9px; font-size: .9rem; }
+.ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn { background: var(--accent); color: var(--on-accent); border: 0; padding: 9px 16px; border-radius: 9px; font-weight: 600; }
+
+.install { display: flex; gap: 12px; align-items: center; justify-content: space-between; background: var(--accent-soft); color: var(--ink); border-radius: 12px; padding: 10px 14px; font-size: .88rem; }
+.install button { background: transparent; border: 0; color: var(--accent); font-weight: 600; padding: 4px 6px; }
+
+.box { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+.query { display: grid; grid-template-columns: minmax(0, 1.5fr) auto minmax(0, .8fr); gap: 20px; align-items: start; }
+@media (max-width: 780px) { .query { grid-template-columns: 1fr; gap: 16px; } }
+.lbl { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+.hint { display: block; font-size: .76rem; color: var(--muted); margin-top: 6px; }
+.combo { position: relative; }
+#drg { width: 100%; font-family: var(--font-mono); font-size: 1.25rem; font-weight: 600; padding: 9px 12px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--bg); }
+#drg:focus, .money:focus-within { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+#sugg { position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); max-height: 340px; overflow: auto; -webkit-overflow-scrolling: touch; }
+#sugg li { display: flex; gap: 10px; padding: 8px 10px; border-radius: 7px; cursor: pointer; align-items: baseline; }
+#sugg li[aria-selected="true"], #sugg li:hover { background: var(--accent-soft); }
+#sugg .c { font-family: var(--font-mono); font-weight: 600; color: var(--accent); flex: none; }
+#sugg .t { font-size: .84rem; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#sugg .m { display: block; font-size: .7rem; color: var(--muted); }
+.examples { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .8rem; color: var(--muted); }
+.chip-ex { font-family: var(--font-mono); font-size: .8rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; }
+.chip-ex:hover { border-color: var(--accent); color: var(--accent); }
+.pccl { display: inline-flex; border: 1.5px solid var(--line); border-radius: 10px; overflow: hidden; }
+.pccl button { width: 40px; height: 46px; border: 0; border-right: 1px solid var(--line); background: var(--bg); font-family: var(--font-mono); font-weight: 600; color: var(--muted); }
+.pccl button:last-child { border-right: 0; }
+.pccl button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.money { display: flex; align-items: center; border: 1.5px solid var(--line); border-radius: 10px; background: var(--bg); }
+.money input { border: 0; background: transparent; width: 100%; min-width: 0; padding: 10px 12px; font-family: var(--font-mono); font-size: 16px; }
+.money input:focus { outline: none; }
+.money span { padding-right: 12px; color: var(--muted); }
+
+.import { display: flex; flex-direction: column; gap: 12px; }
+.import h2 { font-family: var(--font-display); font-size: 1.05rem; margin: 0; }
+.import p { margin: 0; color: var(--muted); font-size: .88rem; max-width: 70ch; }
+.import textarea { width: 100%; min-height: 110px; font-family: var(--font-mono); font-size: 16px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); resize: vertical; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+#impStatus { font-size: .86rem; color: var(--muted); }
+
+.root { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 22px; align-items: center; background: var(--root-bg); color: var(--root-fg); border-radius: 14px; padding: 18px 20px; }
+@media (max-width: 560px) { .root { grid-template-columns: 1fr; gap: 10px; } }
+.eyebrow { display: block; font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: var(--root-muted); font-weight: 600; margin-bottom: 4px; }
+.root-code { font-family: var(--font-mono); font-size: 2.5rem; font-weight: 600; line-height: 1; letter-spacing: .02em; }
+.root h2 { font-family: var(--font-display); font-size: 1.02rem; font-weight: 600; margin: 0 0 8px; line-height: 1.4; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .86rem; color: var(--root-muted); }
+.facts b { color: var(--root-fg); font-family: var(--font-mono); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.bar { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: center; }
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 10px; padding: 3px; }
+.seg button { border: 0; background: transparent; padding: 7px 12px; border-radius: 8px; color: var(--muted); font-weight: 500; font-size: .88rem; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+.check { display: flex; gap: 8px; align-items: center; font-size: .88rem; color: var(--muted); cursor: pointer; }
+.check input { accent-color: var(--accent); width: 18px; height: 18px; flex: none; }
+.summary { font-size: .9rem; color: var(--muted); margin: 0; }
+.summary b { color: var(--ink); }
+
+.result { display: flex; flex-direction: column; gap: 14px; }
+.tree { list-style: none; margin: 0; padding: 0 0 0 34px; }
+.tree > li { position: relative; padding-top: 14px; }
+.tree > li::before { content: ""; position: absolute; left: -18px; top: 0; width: 18px; height: 44px; border-left: 2px solid var(--line); border-bottom: 2px solid var(--line); border-bottom-left-radius: 12px; }
+.tree > li::after { content: ""; position: absolute; left: -18px; top: 0; bottom: 0; border-left: 2px solid var(--line); }
+.tree > li:last-child::after { display: none; }
+.tree > li.best::before { border-color: var(--accent); }
+@media (max-width: 560px) { .tree { padding-left: 20px; } .tree > li::before, .tree > li::after { left: -12px; } .tree > li::before { width: 12px; } }
+
+.node { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+@media (max-width: 560px) { .node { padding: 12px; } }
+.node.top { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.node-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.id { display: flex; gap: 6px 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
+.code { font-family: var(--font-mono); font-weight: 600; font-size: 1.05rem; padding: 2px 8px; background: var(--accent-soft); color: var(--accent); border-radius: 6px; }
+.tag { font-size: .68rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: .05em; }
+.tag.rank { color: var(--gain); background: var(--gain-soft); }
+.tag.jump { color: var(--accent); border: 1px solid var(--accent); }
+.gain { text-align: right; flex: none; }
+.gain b { display: block; font-family: var(--font-display); font-size: 1.35rem; font-weight: 700; color: var(--gain); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.gain span { font-family: var(--font-mono); font-size: .76rem; color: var(--muted); }
+.gain.neg b { color: var(--muted); font-size: 1rem; }
+.node-title { margin: 0; font-size: .86rem; font-weight: 400; color: var(--muted); line-height: 1.45; }
+.node-title mark, .root h2 mark { background: none; color: var(--ink); font-weight: 600; }
+.root h2 mark { color: var(--root-fg); }
+.root h2 { color: var(--root-muted); }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: .82rem; color: var(--muted); }
+.meta .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.effort { display: inline-flex; gap: 7px; align-items: center; font-weight: 600; padding: 2px 10px 2px 8px; border-radius: 999px; font-size: .78rem; }
+.e-1 { color: var(--gain); background: var(--gain-soft); }
+.e-2 { color: var(--warn); background: var(--warn-soft); }
+.e-3 { color: var(--hard); background: var(--hard-soft); }
+.dots { display: inline-flex; gap: 3px; }
+.dots i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .25; }
+.dots i.on { opacity: 1; }
+.req { border-top: 1px dashed var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.req-h { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.alt { display: flex; flex-direction: column; gap: 8px; }
+.item { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 10px; align-items: start; }
+@media (max-width: 560px) { .item { grid-template-columns: 1fr; gap: 4px; } }
+.kind { font-size: .72rem; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: var(--surface-2); justify-self: start; }
+.kind.k-hd, .kind.k-vent, .kind.k-ops, .kind.k-cx { background: var(--warn-soft); color: var(--warn); }
+.item-t { font-size: .9rem; font-weight: 500; }
+.item-d { font-size: .8rem; color: var(--muted); }
+.codes { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.icd { display: inline-flex; gap: 6px; align-items: baseline; font-size: .78rem; padding: 3px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); max-width: 100%; }
+.icd b { font-family: var(--font-mono); font-weight: 600; flex: none; }
+.icd span { color: var(--muted); }
+.and { font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; padding-left: 2px; }
+.or { font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; text-align: center; margin: 4px 0; }
+details.more summary { cursor: pointer; font-size: .84rem; color: var(--accent); font-weight: 500; }
+details.more .alts { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.lockline { font-size: .8rem; color: var(--muted); }
+.actions { display: flex; justify-content: flex-end; }
+.copy { background: transparent; border: 1px solid var(--line); padding: 6px 12px; font-size: .8rem; border-radius: 8px; }
+.copy:hover { border-color: var(--accent); color: var(--accent); }
+
+.empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 12px; padding: 18px; color: var(--muted); font-size: .92rem; }
+.empty b { color: var(--ink); }
+details.lockgrp { font-size: .86rem; color: var(--muted); }
+details.lockgrp summary { cursor: pointer; }
+details.lockgrp ul { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+details.lockgrp .code { font-size: .82rem; padding: 0 6px; }
+
+.note { font-size: .8rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+.note p { margin: 0; max-width: 80ch; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-size: .86rem; box-shadow: var(--shadow); z-index: 20; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="8" cy="7" r="3"/><circle cx="24" cy="16" r="3"/><circle cx="24" cy="26" r="3"/><path d="M8 10v9c0 4 3 7 7 7h6M8 13c0 2 1.5 3 5 3h8"/></svg>
+      </span>
+      <div>
+        <h1>DRG-Erlöspfade</h1>
+        <p>Innere Medizin: naheliegende, höher bewertete DRGs und was dafür in der Akte stehen müsste</p>
+      </div>
+    </div>
+    <button id="btnImport" class="ghost" type="button" aria-expanded="false" aria-controls="importBox">Neuen Katalog laden</button>
+  </header>
+
+  <div id="install" class="install" hidden>
+    <span>Als App installieren: in Safari auf <b>Teilen</b> tippen, dann <b>Zum Home-Bildschirm</b>.</span>
+    <button id="installClose" type="button">Ausblenden</button>
+  </div>
+
+  <section id="importBox" class="box import" hidden>
+    <h2>Neuen Fallpauschalenkatalog übernehmen</h2>
+    <p>Für ein neues Katalogjahr: Katalog als CSV laden (in Excel „Speichern unter → CSV“) oder Zeilen einfügen. Erkannt werden DRG-Code, Partition, Bezeichnung und Bewertungsrelation bei Hauptabteilung. Operative DRGs werden übersprungen. Die Werte bleiben nur auf diesem Gerät gespeichert.</p>
+    <div class="row"><input id="impFile" type="file" accept=".csv,.txt,text/csv,text/plain"></div>
+    <textarea id="impText" spellcheck="false" placeholder="E79C;M;Infektionen und Entzündungen der Atmungsorgane ohne komplexe Diagnose ...;0,622;..."></textarea>
+    <div class="row">
+      <button id="impApply" class="btn" type="button">Werte übernehmen</button>
+      <button id="impReset" class="ghost" type="button">Eingebauten Katalog 2026 nutzen</button>
+      <span id="impStatus" role="status"></span>
+    </div>
+  </section>
+
+  <section class="box query" aria-label="Fall eingeben">
+    <div>
+      <label class="lbl" for="drg">Aktuelle DRG</label>
+      <div class="combo">
+        <input id="drg" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="z. B. E79C oder „Sepsis“" role="combobox" aria-expanded="false" aria-controls="sugg" aria-autocomplete="list">
+        <ul id="sugg" role="listbox" hidden></ul>
+      </div>
+      <div class="examples" id="examples">Beispiele:</div>
+    </div>
+    <div>
+      <span class="lbl" id="pcclLbl">Aktueller PCCL</span>
+      <div class="pccl" id="pccl" role="group" aria-labelledby="pcclLbl"></div>
+      <span class="hint">Aus dem Grouper-Ergebnis. Bestimmt, wie viele CC nötig sind.</span>
+    </div>
+    <div>
+      <label class="lbl" for="lbfw">Landesbasisfallwert</label>
+      <div class="money"><input id="lbfw" type="number" min="1" step="0.01" inputmode="decimal"><span>€</span></div>
+      <span class="hint">Beispielwert, bitte eigenen LBFW eintragen.</span>
+    </div>
+  </section>
+
+  <section id="result" class="result" aria-live="polite"><div class="empty">Katalog wird geladen …</div></section>
+
+  <footer class="note">
+    <p id="dataState"></p>
+    <p>Erlös = Bewertungsrelation × Landesbasisfallwert, ohne Pflegeentgelt, Zu- und Abschläge. Die Wege leitet die App aus den offiziellen DRG-Bezeichnungen ab. Verknüpfungen mit „und“ sowie die Listen „bestimmter“ Diagnosen und Prozeduren stehen im Definitionshandbuch des InEK. Beatmungs-DRGs der Prä-MDC sind nicht enthalten.</p>
+    <p>Nur kodieren, was in der Akte belegt ist: Nebendiagnosen nach DKR D003 (therapeutische oder diagnostische Maßnahmen oder erhöhter Betreuungs-, Pflege- bzw. Überwachungsaufwand), Hauptdiagnose nach DKR D002. Ergebnis immer im Grouper prüfen.</p>
+  </footer>
+</div>
+
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script>
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+};
+
+// Häufig CC-relevante Nebendiagnosen; die tatsächliche CCL hängt von der Basis-DRG ab.
+const HIGH = [
+  ['N17.9-', 'Akutes Nierenversagen (Stadium kodieren)'],
+  ['J96.0-', 'Akute respiratorische Insuffizienz'],
+  ['A41.9', 'Sepsis, nicht näher bezeichnet'],
+  ['D62', 'Akute Blutungsanämie'],
+  ['E43', 'Erhebliche Energie- und Eiweißmangelernährung'],
+  ['L89.3-', 'Dekubitus 4. Grades'],
+  ['J18.9', 'Pneumonie, nicht näher bezeichnet'],
+  ['E87.2', 'Azidose'],
+  ['D69.5-', 'Sekundäre Thrombozytopenie']
+];
+const MID = [
+  ['E87.1', 'Hypoosmolalität und Hyponatriämie'],
+  ['E86', 'Volumenmangel'],
+  ['E87.6', 'Hypokaliämie'],
+  ['N39.0', 'Harnwegsinfektion, Lokalisation nicht näher bezeichnet'],
+  ['F05.1', 'Delir bei Demenz'],
+  ['R13.-', 'Dysphagie'],
+  ['L89.2-', 'Dekubitus 3. Grades'],
+  ['N18.4', 'Chronische Nierenkrankheit, Stadium 4'],
+  ['E44.-', 'Energie- und Eiweißmangelernährung mäßigen/leichten Grades'],
+  ['I48.-', 'Vorhofflimmern und Vorhofflattern']
+];
+// Kodes, die in der jeweiligen Basis-DRG meist die Hauptdiagnose sind
+const EX = { E79: ['J18', 'J15', 'J13'], E64: ['J96'], E65: ['J44'], L63: ['N39', 'N10', 'N30'], L60: ['N17', 'N18'], K62: ['E86', 'E87'], T60: ['A40', 'A41'], T64: ['A41'], G67: ['K92'], H62: ['K85', 'K86'] };
+
+// Beispielkodes zu Schlagworten aus den DRG-Bezeichnungen
+const HINTS = [
+  [/dialyse/, [['8-854.-', 'Hämodialyse'], ['8-853.-', 'Hämofiltration'], ['8-855.-', 'Hämodiafiltration']]],
+  [/intk|intensiv/, [['8-980.-', 'Intensivmedizinische Komplexbehandlung (Basisprozedur)'], ['8-98f.-', 'Aufwendige intensivmedizinische Komplexbehandlung (Basisprozedur)']]],
+  [/frührehab|geriatr/, [['8-550.-', 'Geriatrische frührehabilitative Komplexbehandlung']]],
+  [/isolation/, [['8-987.-', 'Komplexbehandlung bei multiresistenten Erregern'], ['8-98g.-', 'Komplexbehandlung bei nicht multiresistenten isolationspflichtigen Erregern']]],
+  [/multimodal/, [['8-984.-', 'Multimodale Komplexbehandlung bei Diabetes mellitus']]],
+  [/ercp/, [['1-642', 'Diagnostische retrograde Darstellung der Gallen- und Pankreaswege'], ['5-513.-', 'Endoskopische Operationen an den Gallengängen']]],
+  [/transfus/, [['8-800.-', 'Transfusion von Vollblut, Erythrozyten- und Thrombozytenkonzentrat']]],
+  [/chemoth/, [['8-542.-', 'Nicht komplexe Chemotherapie'], ['8-543.-', 'Mittelgradig komplexe und intensive Blockchemotherapie'], ['8-544', 'Hochgradig komplexe und intensive Blockchemotherapie']]],
+  [/bronchoskop/, [['1-620.-', 'Diagnostische Tracheobronchoskopie']]],
+  [/para|tetrapleg/, [['G82.-', 'Paraparese und Paraplegie, Tetraparese und Tetraplegie']]],
+  [/transplant|z\.\s*n\./, [['Z94.-', 'Zustand nach Organ- oder Gewebetransplantation']]],
+  [/ards/, [['J80.0-', 'Atemnotsyndrom des Erwachsenen [ARDS]']]]
+];
+
+const SEPSIS_HD = { k: 'hd', s: 'Sepsis als Hauptdiagnose, nur wenn sie den Aufenthalt hauptsächlich veranlasst hat (DKR D002)', c: [['A41.9', 'Sepsis, nicht näher bezeichnet'], ['A41.51', 'Sepsis durch Escherichia coli'], ['A40.3', 'Sepsis durch Streptococcus pneumoniae']] };
+const AKI_HD = { k: 'hd', s: 'Akutes Nierenversagen als Hauptdiagnose, nur wenn es den Aufenthalt hauptsächlich veranlasst hat (DKR D002)', c: [['N17.9-', 'Akutes Nierenversagen, nicht näher bezeichnet (Stadium kodieren)']] };
+const GIB_HD = { k: 'hd', s: 'GI-Blutung oder Ulkuskrankheit als Hauptdiagnose (DKR D002)', c: [['K92.2', 'Gastrointestinale Blutung, nicht näher bezeichnet'], ['K92.1', 'Meläna'], ['K25.4', 'Ulcus ventriculi, chronisch oder n. n. bez., mit Blutung']] };
+const GERI = { k: 'cx', s: 'Geriatrische frührehabilitative Komplexbehandlung (Mindestmerkmale erfüllt)', c: [['8-550.-', 'Geriatrische frührehabilitative Komplexbehandlung']] };
+const ISO = { k: 'cx', s: 'Komplexbehandlung bei isolationspflichtigen Erregern (Mindestmerkmale erfüllt)', c: [['8-987.-', 'Komplexbehandlung bei multiresistenten Erregern'], ['8-98g.-', 'Komplexbehandlung bei nicht multiresistenten isolationspflichtigen Erregern']] };
+const GERI_FAMS = ['E42', 'G52', 'H44', 'K44', 'L44', 'T44'];
+const ISO_FAMS = ['G77', 'H77', 'K77', 'T77', 'R77'];
+const JUMPS = [
+  { from: f => /^(E6[459]|E7[57]|E79|L6[34]|T6[24]|G6[47]|G70|H6[23])$/.test(f), to: 'T60', req: SEPSIS_HD },
+  { from: f => /^(K62|L6[349])$/.test(f), to: 'L60', req: AKI_HD },
+  { from: f => /^(G67|G70|G72)$/.test(f), to: 'G73', req: GIB_HD },
+  ...GERI_FAMS.map(to => ({ from: f => f[0] === to[0] && f !== to && !GERI_FAMS.includes(f), to, req: GERI })),
+  ...ISO_FAMS.map(to => ({ from: f => f[0] === to[0] && f !== to && !ISO_FAMS.includes(f) && !GERI_FAMS.includes(f), to, req: ISO }))
+];
+
+const EXAMPLES = ['E79C', 'E65C', 'T60E', 'L63E', 'K62C', 'G67C', 'H62C'];
+
+let BASE = null, KAT = LS.get('drg-katalog', null), DB = {}, FAMS = {}, CODES = [], MDC = {};
+
+// Bezeichnung in Abschnitte zerlegen und je Abschnitt Polarität (mit/ohne) und Merkmal bestimmen
+const SPLIT = /(,\s*|\s+(?:oder|od\.)\s+|\s+(?:und|u\.)\s+|\s+(?=(?:mit|m\.|ohne|o\.|bei|außer|au\.)\s))/i;
+function feature(l) {
+  if (/beatm/.test(l)) return { k: 'vent' };
+  if (/komplexbeh|\bintk\b|int\.\s*komplex|intensivmed|frührehab|multimodal/.test(l)) return { k: 'cx' };
+  if (/alter|belegungstag|\bbt\b|verstorben|verleg|\bj\.|jahre?\b|lebensjahr|stunden/.test(l)) return { k: 'lock' };
+  if (/zustand nach|z\.\s*n\./.test(l)) return { k: 'kd' };
+  if (/schwerste\w*\s*cc/.test(l)) return { k: 'cc', p: 5 };
+  if (/mäßig\s*schw\w*\.?\s*cc/.test(l)) return { k: 'cc', p: 2 };
+  if (/äu[ßs]*\w*\.?\s*schw\w*\.?\s*cc/.test(l)) return { k: 'cc', p: 4 };
+  if (/schw\w*\.?\s*cc/.test(l)) return { k: 'cc', p: 3 };
+  if (/\bcc\b/.test(l)) return { k: 'cc', p: 2 };
+  if (/aufw|behandlung|prozedur|eingriff|dialyse|endoskop|gastroskop|koloskop|ercp|bronchoskop|chemoth|strahlenth|transfus|biopsie|punktion|drainage|implant|einlage|katheter|therapie|stent|polygraph|polysomno|apherese|ecmo|stammzell|sonograph|magenballon|lithotripsie|eswl/.test(l)) return { k: 'ops' };
+  if (/diagnose|konstellation|faktor|para|tetrapleg|infekt|entzünd|pneumon|sepsis|neubild|tumor|blutung|ulkus|metast|fistel|ards|organ|krankheit|erkrank|leukämie|lymphom|bestimmt|best\./.test(l)) return { k: 'kd' };
+  return null;
+}
+function parse(t) {
+  if (t._p) return t._p;
+  const parts = t.t.split(SPLIT);
+  const segs = [];
+  let pol = 0;
+  let carry = '';
+  for (let i = 0; i < parts.length; i += 2) {
+    // „außer bei …“ / „ohne mit …“: das alleinstehende Verneinungswort gilt für den folgenden Abschnitt
+    if (/^(außer|au\.|ohne|o\.)$/i.test(parts[i].trim()) && i + 2 < parts.length) { carry += parts[i] + parts[i + 1]; continue; }
+    const s = (carry + parts[i]).trim(), l = s.toLowerCase();
+    carry = '';
+    if (/^(mit|m\.|bei)\s/.test(l)) pol = 1;
+    else if (/^(ohne|o\.|außer|au\.)\s/.test(l)) pol = -1;
+    segs.push({ s, sep: parts[i + 1] || '', pol, f: s ? feature(l) : null });
+  }
+  const seen = new Set(), feats = [];
+  for (const g of segs) {
+    if (g.pol <= 0 || !g.f) continue;
+    const key = g.f.k + (g.f.p || '') + g.s.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    feats.push({ ...g.f, s: g.s });
+  }
+  t._p = { segs, feats, open: feats.filter(f => f.k !== 'lock'), locks: feats.filter(f => f.k === 'lock') };
+  return t._p;
+}
+const isShort = t => /,\s*ein Belegungstag$|verstorben/i.test(t.t);
+
+function buildDB() {
+  DB = {}; FAMS = {};
+  for (const d of BASE.drgs) DB[d.c] = { code: d.c, fam: d.c.slice(0, 3), part: d.p, mdc: d.m, t: d.t, br: d.br, vd: d.vd, src: 'kat26' };
+  if (KAT) {
+    for (const [code, k] of Object.entries(KAT)) {
+      const old = DB[code];
+      DB[code] = { code, fam: code.slice(0, 3), part: k.p || old?.part || 'M', mdc: old?.mdc || '', t: k.t || old?.t || 'DRG ' + code, br: k.br, vd: old?.vd ?? null, src: 'imp' };
+    }
+  }
+  for (const c of Object.keys(DB)) if (DB[c].br != null) (FAMS[DB[c].fam] ||= []).push(c);
+  for (const f in FAMS) FAMS[f].sort();
+  CODES = Object.keys(DB).filter(c => DB[c].br != null).sort();
+}
+
+let state = {
+  code: LS.get('drg-code', 'E79C'),
+  pccl: LS.get('drg-pccl', 2),
+  lbfw: LS.get('drg-lbfw', 4400),
+  sort: LS.get('drg-sort', 'lhf'),
+  procs: LS.get('drg-procs', true)
+};
+
+const fmtEur = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+const fmtEur2 = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const eur = x => fmtEur.format(x);
+const br3 = x => x.toLocaleString('de-DE', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+const dec1 = x => x.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const signed = (x, f) => (x > 0 ? '+' : x < 0 ? '−' : '±') + f(Math.abs(x));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const KIND = { cc: 'Nebendiagnose', kd: 'Diagnose', hd: 'Hauptdiagnose', ops: 'Prozedur', cx: 'Komplexbehandlung', vent: 'Beatmung', gen: 'Splitkriterium', lock: 'Fix' };
+const CC_NAME = { 2: 'mäßig schwere CC', 3: 'schwere CC', 4: 'äußerst schwere CC', 5: 'schwerste CC' };
+const EFFORT = ['', 'leicht', 'mittel', 'aufwendig'];
+
+function ccNeed(p) { return state.pccl >= p ? 1 : Math.min(3, Math.ceil((p - state.pccl) / 1.5)); }
+function effortOf(it) {
+  switch (it.k) {
+    case 'cc': return ccNeed(it.p);
+    case 'kd': return 1.2;
+    case 'gen': return 1.5;
+    case 'hd': return 2;
+    case 'ops': return 2.5;
+    case 'vent': return 3;
+    case 'cx': return 3.5;
+    default: return Infinity;
+  }
+}
+const isProc = it => it.k === 'ops' || it.k === 'cx' || it.k === 'vent';
+const effortLevel = e => e <= 1.25 ? 1 : e <= 2.6 ? 2 : 3;
+
+function pool(p, fam) {
+  const ex = EX[fam] || [];
+  const ok = ([c]) => !ex.some(e => c.startsWith(e));
+  const hi = HIGH.filter(ok), mid = MID.filter(ok);
+  if (p >= 4) return hi.slice(0, 6);
+  if (p === 3) return hi.slice(0, 3).concat(mid.slice(0, 3));
+  return mid.slice(0, 6);
+}
+function codesFor(it, fam) {
+  if (it.k === 'cc') return pool(it.p, fam);
+  if (it.k === 'gen') return pool(3, fam);
+  if (it.c) return it.c;
+  const l = (it.s || '').toLowerCase();
+  for (const [re, codes] of HINTS) if (re.test(l)) return codes;
+  return [];
+}
+function itemText(it) {
+  if (it.k === 'gen') return 'Splitkriterium laut Definitionshandbuch prüfen';
+  return it.s;
+}
+function itemDetail(it) {
+  if (it.k === 'cc') {
+    if (state.pccl >= it.p) return `PCCL ${state.pccl} reicht rechnerisch für ${CC_NAME[it.p]}. Wahrscheinlich fehlt ein weiteres Merkmal aus der Bezeichnung.`;
+    const n = ccNeed(it.p);
+    return `${CC_NAME[it.p]}: bei PCCL ${state.pccl} ca. ${n} zusätzliche CC-relevante Nebendiagnose${n > 1 ? 'n' : ''} (Schätzung).`;
+  }
+  if (it.k === 'gen') return 'Aus der Bezeichnung ist kein Merkmal ableitbar.';
+  if (it.k === 'kd') return 'Diagnosenliste der Basis-DRG im Definitionshandbuch prüfen.';
+  if (it.k === 'cx' || it.k === 'ops') return 'Nur wenn durchgeführt und dokumentiert. Mindestmerkmale des OPS-Kodes prüfen.';
+  if (it.k === 'vent') return 'Beatmungsstunden nach DKR 1001 vollständig dokumentiert, inkl. NIV?';
+  return '';
+}
+
+function mkNode(t, alts, base, locks) {
+  const evals = alts.map(items => ({ items, e: items.reduce((s, it) => s + effortOf(it), 0) })).sort((a, b) => a.e - b.e);
+  const open = state.procs ? evals : evals.filter(a => !a.items.some(isProc));
+  const best = open[0] || null;
+  const delta = (t.br - base.br) * state.lbfw;
+  return {
+    d: t, delta, dbr: t.br - base.br, alts: open, best, locks: locks || [],
+    hiddenProc: !best && evals.length > 0,
+    effort: best ? best.e : Infinity,
+    score: best && delta > 0 ? delta / (best.e * best.e) : -Infinity,
+    children: []
+  };
+}
+function altsFor(t, pre) {
+  const p = parse(t);
+  if (p.open.length) return p.open.map(f => [...pre, f]);
+  if (pre.length) return [pre];
+  return p.locks.length ? [] : [[{ k: 'gen' }]];
+}
+
+function build(d) {
+  const out = [], locked = [];
+  let hiddenProc = 0;
+  for (const c of FAMS[d.fam] || []) {
+    const t = DB[c];
+    if (c === d.code || t.br <= d.br || isShort(t)) continue;
+    const n = mkNode(t, altsFor(t, []), d, parse(t).locks);
+    if (n.best) out.push(n); else if (n.hiddenProc) hiddenProc++; else locked.push(n);
+  }
+  for (const j of JUMPS) {
+    if (!j.from(d.fam) || !FAMS[j.to]) continue;
+    const fam = FAMS[j.to].map(c => DB[c]).filter(t => !isShort(t));
+    if (!fam.length) continue;
+    const entryCost = t => { const o = parse(t).open; return o.length ? Math.min(...o.map(effortOf)) : 0; };
+    const entry = fam.slice().sort((a, b) => entryCost(a) - entryCost(b) || a.br - b.br)[0];
+    const n = mkNode(entry, altsFor(entry, [j.req]), d, parse(entry).locks);
+    n.jump = true;
+    if (!n.best) { if (n.hiddenProc) hiddenProc++; continue; }
+    for (const t of fam) {
+      if (t === entry || t.br <= entry.br) continue;
+      const ch = mkNode(t, altsFor(t, [j.req]), d, parse(t).locks);
+      ch.via = entry.code;
+      if (ch.best && ch.delta > 0) n.children.push(ch);
+    }
+    if (n.delta > 0 || n.children.length) out.push(n);
+  }
+  const key = n => state.sort === 'lhf'
+    ? Math.max(n.score, ...n.children.map(c => c.score))
+    : Math.max(n.delta, ...n.children.map(c => c.delta));
+  const byKey = (a, b) => key(b) - key(a);
+  out.sort(byKey);
+  out.forEach(n => n.children.sort(byKey));
+  let top = null, topParent = null;
+  for (const n of out) for (const m of [n, ...n.children]) {
+    const v = state.sort === 'lhf' ? m.score : m.delta;
+    if (m.best && m.delta > 0 && (!top || v > (state.sort === 'lhf' ? top.score : top.delta))) { top = m; topParent = n; }
+  }
+  if (top) { top.isBest = true; topParent.onPath = true; }
+  return { out, locked, hiddenProc };
+}
+
+function titleHtml(t) {
+  return parse(t).segs.map(g => (g.pol > 0 && g.f && g.f.k !== 'lock' ? `<mark>${esc(g.s)}</mark>` : esc(g.s)) + esc(g.sep)).join('');
+}
+function codesHtml(list) {
+  if (!list.length) return '';
+  return `<div class="codes">${list.map(([c, t]) => `<span class="icd"><b>${esc(c)}</b><span>${esc(t)}</span></span>`).join('')}</div>`;
+}
+function altHtml(alt, fam) {
+  return `<div class="alt">${alt.items.map(it => {
+    const det = itemDetail(it);
+    return `<div class="item"><span class="kind k-${it.k}">${KIND[it.k]}</span><div><div class="item-t">${esc(itemText(it))}</div>${det ? `<div class="item-d">${esc(det)}</div>` : ''}${codesHtml(codesFor(it, fam))}</div></div>`;
+  }).join('<div class="and">und</div>')}</div>`;
+}
+
+let copyTexts = [];
+function copyText(n, base) {
+  const lines = [
+    `${base.code} → ${n.d.code}: ${n.d.t}`,
+    `Mehrerlös ca. ${signed(n.delta, eur)} (${signed(n.dbr, br3)} BR bei LBFW ${fmtEur2.format(state.lbfw)})`,
+    '', 'In der Akte suchen:'
+  ];
+  n.alts.forEach((a, i) => {
+    if (i) lines.push('oder');
+    a.items.forEach(it => {
+      lines.push(`- ${KIND[it.k]}: ${itemText(it)}`);
+      const cs = codesFor(it, n.d.fam);
+      if (cs.length) lines.push('  z. B. ' + cs.map(c => c[0] + ' ' + c[1]).join('; '));
+    });
+  });
+  lines.push('', 'Nur kodieren, was nach DKR D002/D003 belegt ist. Ergebnis im Grouper prüfen.');
+  return lines.join('\n');
+}
+
+function card(n, base) {
+  const lvl = effortLevel(n.effort);
+  const others = n.alts.slice(1);
+  const idx = copyTexts.push(copyText(n, base)) - 1;
+  const tags = [
+    n.isBest ? `<span class="tag rank">${state.sort === 'lhf' ? 'Low Hanging Fruit' : 'Höchster Mehrerlös'}</span>` : '',
+    n.jump ? '<span class="tag jump">Andere Basis-DRG</span>' : '',
+    n.via ? `<span class="tag jump">über ${esc(n.via)}</span>` : ''
+  ].join('');
+  return `<article class="node${n.isBest ? ' top' : ''}">
+    <div class="node-head">
+      <div class="id"><span class="code">${esc(n.d.code)}</span>${tags}</div>
+      <div class="gain${n.delta > 0 ? '' : ' neg'}"><b>${n.delta > 0 ? signed(n.delta, eur) : 'Zwischenschritt'}</b><span>${signed(n.dbr, br3)} BR</span></div>
+    </div>
+    <p class="node-title">${titleHtml(n.d)}</p>
+    <div class="meta">
+      <span class="effort e-${lvl}"><span class="dots" aria-hidden="true">${[1, 2, 3].map(i => `<i class="${i <= lvl ? 'on' : ''}"></i>`).join('')}</span>Aufwand ${EFFORT[lvl]}</span>
+      <span>BR <span class="num">${br3(n.d.br)}</span></span>
+      <span>Erlös <span class="num">${eur(n.d.br * state.lbfw)}</span></span>
+      ${n.d.vd ? `<span>mVWD <span class="num">${dec1(n.d.vd)}</span> Tage</span>` : ''}
+    </div>
+    <div class="req">
+      <div class="req-h">In der Akte suchen</div>
+      ${altHtml(n.best, n.d.fam)}
+      ${others.length ? `<details class="more"><summary>${others.length === 1 ? 'Ein weiterer Weg' : others.length + ' weitere Wege'} laut Bezeichnung</summary><div class="alts">${others.map(a => '<div class="or">oder</div>' + altHtml(a, n.d.fam)).join('')}</div></details>` : ''}
+      ${n.locks.length ? `<div class="lockline">Fallbedingungen laut Bezeichnung: ${n.locks.map(f => esc(f.s)).join(', ')}</div>` : ''}
+    </div>
+    <div class="actions"><button class="copy" type="button" data-copy="${idx}">Prüfliste kopieren</button></div>
+  </article>`;
+}
+function li(n, base) {
+  return `<li class="${n.isBest || n.onPath ? 'best' : ''}">${card(n, base)}${n.children.length ? `<ul class="tree">${n.children.map(c => li(c, base)).join('')}</ul>` : ''}</li>`;
+}
+
+const result = document.getElementById('result');
+function render() {
+  copyTexts = [];
+  document.getElementById('dataState').textContent = KAT
+    ? `Datenstand: importierter Katalog (${Object.keys(KAT).length} DRGs), ergänzt um den eingebauten Katalog 2026.`
+    : `Datenstand: ${BASE.source}, Bewertungsrelationen bei Hauptabteilung. ${CODES.length} internistische DRGs (Partition M und A) aus den MDC ${Object.keys(BASE.mdc).join(', ')}, ohne Kardiologie und Rheumatologie.`;
+  const d = DB[state.code];
+  if (!d || d.br == null) {
+    result.innerHTML = `<div class="empty"><b>${esc(state.code || 'Keine DRG')}</b> ist nicht im Datenbestand. Enthalten sind internistische DRGs ohne Kardiologie und Rheumatologie. Wählen Sie eine DRG aus der Liste.</div>`;
+    return;
+  }
+  const { out, locked, hiddenProc } = build(d);
+  const all = out.flatMap(n => [n, ...n.children]).filter(n => n.delta > 0 && n.best);
+  const easiest = all.slice().sort((a, b) => a.effort - b.effort || b.delta - a.delta)[0];
+  const biggest = all.slice().sort((a, b) => b.delta - a.delta)[0];
+
+  let html = `<div class="bar">
+      <div class="seg" role="group" aria-label="Sortierung">
+        <button type="button" data-sort="lhf" aria-pressed="${state.sort === 'lhf'}">Low Hanging Fruit</button>
+        <button type="button" data-sort="erl" aria-pressed="${state.sort === 'erl'}">Höchster Mehrerlös</button>
+      </div>
+      <label class="check"><input id="procs" type="checkbox" ${state.procs ? 'checked' : ''}>Prozeduren einbeziehen</label>
+    </div>
+    <div>
+      <div class="root">
+        <div><span class="eyebrow">Aktuelle DRG</span><div class="root-code">${esc(d.code)}</div></div>
+        <div><h2>${titleHtml(d)}</h2>
+          <div class="facts"><span>BR <b>${br3(d.br)}</b></span><span>Erlös <b>${eur(d.br * state.lbfw)}</b></span>${d.vd ? `<span>mVWD <b>${dec1(d.vd)}</b></span>` : ''}<span>PCCL <b>${state.pccl}</b></span>${BASE.mdc[d.mdc] ? `<span>MDC ${esc(d.mdc)} · ${esc(BASE.mdc[d.mdc])}</span>` : ''}</div>
+        </div>
+      </div>`;
+  if (out.length) {
+    html += `<ul class="tree">${out.map(n => li(n, d)).join('')}</ul></div>`;
+    if (all.length) html += `<p class="summary"><b>${all.length}</b> ${all.length === 1 ? 'Pfad' : 'Pfade'} mit Mehrerlös. Leichtester Weg: <b>${esc(easiest.d.code)}</b> (${signed(easiest.delta, eur)}, Aufwand ${EFFORT[effortLevel(easiest.effort)]}). Größter Mehrerlös: <b>${esc(biggest.d.code)}</b> (${signed(biggest.delta, eur)}).</p>`;
+  } else {
+    html += `</div><div class="empty">Keine höher bewertete DRG in Reichweite${hiddenProc ? ' ohne Prozeduren' : ''}. <b>${esc(d.code)}</b> ist hier bereits die höchste naheliegende Stufe.</div>`;
+  }
+  if (hiddenProc) html += `<p class="summary">${hiddenProc} ${hiddenProc === 1 ? 'Pfad ist' : 'Pfade sind'} nur über Prozeduren erreichbar und ausgeblendet.</p>`;
+  if (locked.length) html += `<details class="lockgrp"><summary>${locked.length} höher bewertete ${locked.length === 1 ? 'DRG' : 'DRGs'} nur über Fallbedingungen wie Alter oder Verweildauer</summary><ul>${locked.map(n => `<li><span class="code">${esc(n.d.code)}</span> ${signed(n.delta, eur)}: ${esc(n.locks.map(f => f.s).join(', '))}</li>`).join('')}</ul></details>`;
+  result.innerHTML = html;
+}
+
+result.addEventListener('click', e => {
+  const s = e.target.closest('[data-sort]');
+  if (s) { state.sort = s.dataset.sort; LS.set('drg-sort', state.sort); render(); return; }
+  const c = e.target.closest('[data-copy]');
+  if (c) copy(copyTexts[+c.dataset.copy]);
+});
+result.addEventListener('change', e => {
+  if (e.target.id === 'procs') { state.procs = e.target.checked; LS.set('drg-procs', state.procs); render(); }
+});
+
+const toastEl = document.getElementById('toast');
+let toastT;
+function toast(msg) { toastEl.textContent = msg; toastEl.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => toastEl.hidden = true, 2200); }
+function copy(text) {
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+    toast(ok ? 'Prüfliste kopiert' : 'Kopieren ist hier nicht möglich');
+  };
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(() => toast('Prüfliste kopiert'), fallback);
+  else fallback();
+}
+
+// Suche
+const input = document.getElementById('drg'), sugg = document.getElementById('sugg');
+let matches = [], active = -1;
+function showSugg() {
+  const q = input.value.trim().toUpperCase();
+  const starts = CODES.filter(c => c.startsWith(q));
+  const text = q.length > 2 ? CODES.filter(c => !c.startsWith(q) && DB[c].t.toUpperCase().includes(q)) : [];
+  matches = starts.concat(text).slice(0, 12);
+  active = matches.length ? 0 : -1;
+  sugg.innerHTML = matches.map((c, i) => `<li role="option" id="opt${i}" data-code="${c}" aria-selected="${i === active}"><span class="c">${c}</span><span><span class="t">${esc(DB[c].t)}</span><span class="m">BR ${br3(DB[c].br)}${BASE.mdc[DB[c].mdc] ? ' · ' + esc(BASE.mdc[DB[c].mdc]) : ''}</span></span></li>`).join('');
+  sugg.hidden = !matches.length;
+  input.setAttribute('aria-expanded', String(!sugg.hidden));
+}
+function hideSugg() { sugg.hidden = true; input.setAttribute('aria-expanded', 'false'); }
+function pick(code) {
+  state.code = code; input.value = code; LS.set('drg-code', code); hideSugg(); render();
+}
+input.addEventListener('input', showSugg);
+input.addEventListener('focus', () => { input.select(); showSugg(); });
+input.addEventListener('blur', () => setTimeout(hideSugg, 150));
+input.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (sugg.hidden) showSugg();
+    if (!matches.length) return;
+    e.preventDefault();
+    active = (active + (e.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length;
+    [...sugg.children].forEach((el, i) => el.setAttribute('aria-selected', String(i === active)));
+    sugg.children[active].scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    pick(!sugg.hidden && active >= 0 ? matches[active] : input.value.trim().toUpperCase());
+    input.blur();
+  } else if (e.key === 'Escape') hideSugg();
+});
+sugg.addEventListener('mousedown', e => e.preventDefault());
+sugg.addEventListener('click', e => {
+  const o = e.target.closest('[data-code]');
+  if (o) { pick(o.dataset.code); input.blur(); }
+});
+
+const pcclBox = document.getElementById('pccl');
+pcclBox.innerHTML = [0, 1, 2, 3, 4, 5, 6].map(p => `<button type="button" data-p="${p}" aria-pressed="${p === state.pccl}" aria-label="PCCL ${p}">${p}</button>`).join('');
+pcclBox.addEventListener('click', e => {
+  const b = e.target.closest('[data-p]');
+  if (!b) return;
+  state.pccl = +b.dataset.p; LS.set('drg-pccl', state.pccl);
+  [...pcclBox.children].forEach(x => x.setAttribute('aria-pressed', String(+x.dataset.p === state.pccl)));
+  render();
+});
+
+const lbfwIn = document.getElementById('lbfw');
+lbfwIn.value = state.lbfw;
+lbfwIn.addEventListener('input', () => {
+  const v = parseFloat(String(lbfwIn.value).replace(',', '.'));
+  if (v > 0) { state.lbfw = v; LS.set('drg-lbfw', v); render(); }
+});
+
+// Katalogimport für neue Katalogjahre
+const impBox = document.getElementById('importBox'), btnImport = document.getElementById('btnImport');
+const impText = document.getElementById('impText'), impStatus = document.getElementById('impStatus');
+btnImport.addEventListener('click', () => {
+  impBox.hidden = !impBox.hidden;
+  btnImport.setAttribute('aria-expanded', String(!impBox.hidden));
+});
+const IM_LETTERS = /^[EGHKLQRSTVX]/;
+function parseCatalog(text) {
+  const out = {};
+  for (const line of text.split(/\r?\n/)) {
+    const cells = line.split(/;|\t/).map(s => s.trim().replace(/^"|"$/g, ''));
+    const i = cells.findIndex(c => /^[A-Z0-9]\d{2}[A-Z]$/.test(c));
+    if (i < 0 || !IM_LETTERS.test(cells[i])) continue;
+    const part = /^[OAM]$/.test(cells[i + 1]) ? cells[i + 1] : null;
+    if (part === 'O') continue;
+    let title = '', br = null;
+    for (let j = i + 1; j < cells.length; j++) {
+      const c = cells[j];
+      if (!title && c.length > 12 && /[a-zäöüß]/i.test(c)) { title = c; continue; }
+      if (title && /^\d{1,2}[,.]\d{3,4}$/.test(c)) { br = parseFloat(c.replace(',', '.')); break; }
+    }
+    if (br != null) out[cells[i]] = { t: title, br, p: part };
+  }
+  return out;
+}
+document.getElementById('impFile').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const read = enc => new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsText(f, enc); });
+  read('utf-8').then(t => t.includes(String.fromCharCode(0xFFFD)) ? read('windows-1252') : t).then(t => {
+    impText.value = t;
+    impStatus.textContent = `${f.name} geladen. Jetzt „Werte übernehmen“ wählen.`;
+  });
+});
+document.getElementById('impApply').addEventListener('click', () => {
+  const parsed = parseCatalog(impText.value);
+  const n = Object.keys(parsed).length;
+  if (!n) { impStatus.textContent = 'Keine internistischen DRG-Zeilen erkannt. Erwartet wird pro Zeile ein DRG-Code (z. B. E79C), die Bezeichnung und eine Bewertungsrelation (z. B. 0,622).'; return; }
+  KAT = parsed; LS.set('drg-katalog', KAT); buildDB(); render();
+  impStatus.textContent = `${n} DRGs übernommen.`;
+});
+document.getElementById('impReset').addEventListener('click', () => {
+  KAT = null; LS.del('drg-katalog'); buildDB(); render();
+  impStatus.textContent = 'Eingebauter Katalog 2026 aktiv.';
+});
+
+// Hinweis zur Installation auf dem iPhone
+const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+const inFrame = window.self !== window.top;
+if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !standalone && !inFrame && !LS.get('drg-install-hidden', false)) {
+  document.getElementById('install').hidden = false;
+}
+document.getElementById('installClose').addEventListener('click', () => {
+  document.getElementById('install').hidden = true; LS.set('drg-install-hidden', true);
+});
+if ('serviceWorker' in navigator && !inFrame && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+
+fetch('drgs.json').then(r => r.json()).then(data => {
+  BASE = data;
+  buildDB();
+  const ex = document.getElementById('examples');
+  ex.insertAdjacentHTML('beforeend', EXAMPLES.filter(c => DB[c]).map(c => `<button type="button" class="chip-ex" data-ex="${c}">${c}</button>`).join(''));
+  ex.addEventListener('click', e => { const b = e.target.closest('[data-ex]'); if (b) pick(b.dataset.ex); });
+  if (!DB[state.code]) state.code = 'E79C';
+  input.value = state.code;
+  render();
+}).catch(() => {
+  result.innerHTML = '<div class="empty">Der Katalog konnte nicht geladen werden. Bitte die App einmal mit Internetverbindung öffnen.</div>';
+});
+</script>
+</body>
+</html>
