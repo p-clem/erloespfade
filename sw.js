@@ -1,5 +1,5 @@
 // Offline-Betrieb: App-Dateien beim Installieren speichern, danach aus dem Speicher laden und im Hintergrund aktualisieren.
-const CACHE = 'erloespfade-2026-2';
+const CACHE = 'erloespfade-2026-3';
 const FILES = ['./', 'index.html', 'drgs.json', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
